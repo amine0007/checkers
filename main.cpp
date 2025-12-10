@@ -1,38 +1,49 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
-#include <cmath> // Nécessaire pour abs() (valeur absolue)
+#include <cmath> 
 
 const int TILE_SIZE = 80;
 
-// Fonction pour vérifier si un mouvement est autorisé
+// Fonction mise à jour pour gérer les sauts
 bool mouvementValide(int x1, int y1, int x2, int y2, int plateau[8][8], int joueurActuel) {
     
-    // 1. On ne peut aller que sur une case vide
+    // 1. Destination doit être vide
     if (plateau[y2][x2] != 0) return false;
 
     // 2. Calcul des écarts
-    int diffX = abs(x2 - x1);
-    int diffY = y2 - y1; // Pas de abs() ici car le sens compte !
+    int diffX = x2 - x1;
+    int diffY = y2 - y1; 
 
-    // 3. Vérification pour les BLANCS (1) : Doivent monter (diffY négatif)
-    if (joueurActuel == 1) {
-        if (diffY == -1 && diffX == 1) return true; // Déplacement simple
-    }
-    
-    // 4. Vérification pour les ROUGES (2) : Doivent descendre (diffY positif)
-    if (joueurActuel == 2) {
-        if (diffY == 1 && diffX == 1) return true; // Déplacement simple
+    // Direction autorisée (1 = vers le haut (-), 2 = vers le bas (+))
+    int direction = (joueurActuel == 1) ? -1 : 1;
+
+    // --- CAS 1 : DÉPLACEMENT SIMPLE (1 case) ---
+    if (abs(diffX) == 1 && diffY == direction) {
+        return true;
     }
 
-    // Si aucune condition n'est remplie
+    // --- CAS 2 : MANGER (2 cases) ---
+    if (abs(diffX) == 2 && diffY == 2 * direction) {
+        // On doit vérifier qu'il y a un ennemi au milieu
+        int midX = (x1 + x2) / 2;
+        int midY = (y1 + y2) / 2;
+        int contenuMilieu = plateau[midY][midX];
+
+        // L'ennemi est le chiffre opposé (Si je suis 1, ennemi est 2. Si je suis 2, ennemi est 1)
+        int ennemi = (joueurActuel == 1) ? 2 : 1;
+
+        if (contenuMilieu == ennemi) {
+            return true; // Saut autorisé !
+        }
+    }
+
     return false;
 }
 
 int main()
 {
-    sf::RenderWindow window(sf::VideoMode(TILE_SIZE * 8, TILE_SIZE * 8), "Jeu de Dames - Regles de base");
+    sf::RenderWindow window(sf::VideoMode(TILE_SIZE * 8, TILE_SIZE * 8), "Jeu de Dames - Prise de pions");
 
-    // 0 = Vide, 1 = Blanc, 2 = Rouge
     int plateau[8][8] = {
         {0, 2, 0, 2, 0, 2, 0, 2},
         {2, 0, 2, 0, 2, 0, 2, 0},
@@ -45,8 +56,6 @@ int main()
     };
 
     sf::Vector2i selection(-1, -1);
-    
-    // Variable pour savoir à qui c'est le tour (1 = Blanc commence)
     int tourActuel = 1; 
 
     while (window.isOpen())
@@ -69,37 +78,34 @@ int main()
                         // SÉLECTION
                         if (selection.x == -1) 
                         {
-                            // On vérifie que le joueur clique bien sur SA couleur
                             if (plateau[y][x] == tourActuel) {
                                 selection = sf::Vector2i(x, y);
-                                std::cout << "Pion selectionne" << std::endl;
-                            } else if (plateau[y][x] != 0) {
-                                std::cout << "Ce n'est pas votre tour !" << std::endl;
                             }
                         }
                         // DÉPLACEMENT
                         else 
                         {
-                            // Si on clique sur la même case, on désélectionne
                             if (x == selection.x && y == selection.y) {
-                                selection = sf::Vector2i(-1, -1);
+                                selection = sf::Vector2i(-1, -1); // Annuler
                             }
-                            // Sinon on tente le mouvement
                             else if (mouvementValide(selection.x, selection.y, x, y, plateau, tourActuel)) {
                                 
-                                // On déplace le pion
+                                // --- NOUVEAU : GESTION DE LA PRISE ---
+                                // Si on a bougé de 2 cases, c'est qu'on a mangé quelqu'un
+                                if (abs(x - selection.x) == 2) {
+                                    int midX = (x + selection.x) / 2;
+                                    int midY = (y + selection.y) / 2;
+                                    plateau[midY][midX] = 0; // On supprime le pion mangé !
+                                    std::cout << "MIAM ! Pion mange en " << midX << "," << midY << std::endl;
+                                }
+
+                                // Déplacement standard
                                 plateau[y][x] = plateau[selection.y][selection.x];
                                 plateau[selection.y][selection.x] = 0;
                                 
-                                // Fin du tour : on change de joueur
-                                if (tourActuel == 1) tourActuel = 2;
-                                else tourActuel = 1;
-
-                                selection = sf::Vector2i(-1, -1); // Désélectionner
-                                std::cout << "Mouvement valide ! Au tour de " << tourActuel << std::endl;
-                            }
-                            else {
-                                std::cout << "Mouvement IMPOSSIBLE (Regles non respectees)" << std::endl;
+                                // Changement de tour
+                                tourActuel = (tourActuel == 1) ? 2 : 1;
+                                selection = sf::Vector2i(-1, -1);
                             }
                         }
                     }
@@ -120,7 +126,6 @@ int main()
                 else caseCarre.setFillColor(sf::Color(118, 150, 86));
                 window.draw(caseCarre);
 
-                // Surlignage
                 if (selection.x == x && selection.y == y) {
                     sf::RectangleShape highlight(sf::Vector2f(TILE_SIZE, TILE_SIZE));
                     highlight.setPosition(x * TILE_SIZE, y * TILE_SIZE);
@@ -128,7 +133,6 @@ int main()
                     window.draw(highlight);
                 }
 
-                // Pions
                 if (plateau[y][x] != 0) {
                     sf::CircleShape pion(TILE_SIZE / 2 - 10);
                     pion.setPosition(x * TILE_SIZE + 10, y * TILE_SIZE + 10);
