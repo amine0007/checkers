@@ -1,11 +1,36 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <cmath> // Nécessaire pour abs() (valeur absolue)
 
 const int TILE_SIZE = 80;
 
+// Fonction pour vérifier si un mouvement est autorisé
+bool mouvementValide(int x1, int y1, int x2, int y2, int plateau[8][8], int joueurActuel) {
+    
+    // 1. On ne peut aller que sur une case vide
+    if (plateau[y2][x2] != 0) return false;
+
+    // 2. Calcul des écarts
+    int diffX = abs(x2 - x1);
+    int diffY = y2 - y1; // Pas de abs() ici car le sens compte !
+
+    // 3. Vérification pour les BLANCS (1) : Doivent monter (diffY négatif)
+    if (joueurActuel == 1) {
+        if (diffY == -1 && diffX == 1) return true; // Déplacement simple
+    }
+    
+    // 4. Vérification pour les ROUGES (2) : Doivent descendre (diffY positif)
+    if (joueurActuel == 2) {
+        if (diffY == 1 && diffX == 1) return true; // Déplacement simple
+    }
+
+    // Si aucune condition n'est remplie
+    return false;
+}
+
 int main()
 {
-    sf::RenderWindow window(sf::VideoMode(TILE_SIZE * 8, TILE_SIZE * 8), "Jeu de Dames - Interaction");
+    sf::RenderWindow window(sf::VideoMode(TILE_SIZE * 8, TILE_SIZE * 8), "Jeu de Dames - Regles de base");
 
     // 0 = Vide, 1 = Blanc, 2 = Rouge
     int plateau[8][8] = {
@@ -19,9 +44,10 @@ int main()
         {1, 0, 1, 0, 1, 0, 1, 0}
     };
 
-    // Variables pour mémoriser la sélection
-    // -1 signifie "Aucune case sélectionnée"
     sf::Vector2i selection(-1, -1);
+    
+    // Variable pour savoir à qui c'est le tour (1 = Blanc commence)
+    int tourActuel = 1; 
 
     while (window.isOpen())
     {
@@ -31,43 +57,49 @@ int main()
             if (event.type == sf::Event::Closed)
                 window.close();
 
-            // --- GESTION DU CLIC SOURIS ---
             if (event.type == sf::Event::MouseButtonPressed)
             {
                 if (event.mouseButton.button == sf::Mouse::Left)
                 {
-                    // 1. On convertit les Pixels en coordonnée de grille (0-7)
                     int x = event.mouseButton.x / TILE_SIZE;
                     int y = event.mouseButton.y / TILE_SIZE;
 
-                    // Vérification de sécurité (pour ne pas cliquer hors du tableau)
                     if (x >= 0 && x < 8 && y >= 0 && y < 8)
                     {
-                        // CAS A : Rien n'est sélectionné -> On sélectionne
+                        // SÉLECTION
                         if (selection.x == -1) 
                         {
-                            // On ne sélectionne que s'il y a un pion (case != 0)
-                            if (plateau[y][x] != 0) {
+                            // On vérifie que le joueur clique bien sur SA couleur
+                            if (plateau[y][x] == tourActuel) {
                                 selection = sf::Vector2i(x, y);
-                                std::cout << "Pion selectionne en : " << x << ", " << y << std::endl;
+                                std::cout << "Pion selectionne" << std::endl;
+                            } else if (plateau[y][x] != 0) {
+                                std::cout << "Ce n'est pas votre tour !" << std::endl;
                             }
                         }
-                        // CAS B : Un pion est DÉJÀ sélectionné -> On bouge
+                        // DÉPLACEMENT
                         else 
                         {
-                            // Si on clique sur la case vide, on déplace
-                            if (plateau[y][x] == 0) {
-                                // Déplacement : La case d'arrivée prend la valeur du pion
+                            // Si on clique sur la même case, on désélectionne
+                            if (x == selection.x && y == selection.y) {
+                                selection = sf::Vector2i(-1, -1);
+                            }
+                            // Sinon on tente le mouvement
+                            else if (mouvementValide(selection.x, selection.y, x, y, plateau, tourActuel)) {
+                                
+                                // On déplace le pion
                                 plateau[y][x] = plateau[selection.y][selection.x];
-                                // La case de départ devient vide
                                 plateau[selection.y][selection.x] = 0;
                                 
-                                std::cout << "Deplacement vers : " << x << ", " << y << std::endl;
-                                selection = sf::Vector2i(-1, -1); // On désélectionne
+                                // Fin du tour : on change de joueur
+                                if (tourActuel == 1) tourActuel = 2;
+                                else tourActuel = 1;
+
+                                selection = sf::Vector2i(-1, -1); // Désélectionner
+                                std::cout << "Mouvement valide ! Au tour de " << tourActuel << std::endl;
                             }
-                            // Si on clique sur un autre pion ou le même -> On change la sélection
-                            else if (plateau[y][x] != 0) {
-                                selection = sf::Vector2i(x, y);
+                            else {
+                                std::cout << "Mouvement IMPOSSIBLE (Regles non respectees)" << std::endl;
                             }
                         }
                     }
@@ -84,21 +116,19 @@ int main()
                 sf::RectangleShape caseCarre(sf::Vector2f(TILE_SIZE, TILE_SIZE));
                 caseCarre.setPosition(x * TILE_SIZE, y * TILE_SIZE);
 
-                // Couleur du damier
                 if ((x + y) % 2 == 0) caseCarre.setFillColor(sf::Color(238, 238, 210));
                 else caseCarre.setFillColor(sf::Color(118, 150, 86));
-
                 window.draw(caseCarre);
 
-                // SURBRILLANCE : Si cette case est celle sélectionnée, on ajoute un filtre bleu
+                // Surlignage
                 if (selection.x == x && selection.y == y) {
                     sf::RectangleShape highlight(sf::Vector2f(TILE_SIZE, TILE_SIZE));
                     highlight.setPosition(x * TILE_SIZE, y * TILE_SIZE);
-                    highlight.setFillColor(sf::Color(0, 0, 255, 100)); // Bleu transparent
+                    highlight.setFillColor(sf::Color(0, 0, 255, 100));
                     window.draw(highlight);
                 }
 
-                // DESSIN DU PION
+                // Pions
                 if (plateau[y][x] != 0) {
                     sf::CircleShape pion(TILE_SIZE / 2 - 10);
                     pion.setPosition(x * TILE_SIZE + 10, y * TILE_SIZE + 10);
