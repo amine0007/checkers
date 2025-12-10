@@ -1,34 +1,71 @@
 #include <SFML/Graphics.hpp>
+#include <vector>
+
+// Taille d'une case en pixels
+const int TILE_SIZE = 80;
 
 int main()
 {
-    // Crée une fenêtre de 800x600 pixels
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Mon Jeu de Dames");
+    // La fenêtre fera 8 cases de large * 80 pixels = 640x640
+    sf::RenderWindow window(sf::VideoMode(TILE_SIZE * 8, TILE_SIZE * 8), "Jeu de Dames C++");
 
-    // Crée un pion (un cercle rouge)
-    sf::CircleShape pion(40.f); // Rayon de 40
-    pion.setFillColor(sf::Color::Red);
-    pion.setPosition(100.f, 100.f); // Position X, Y
+    // 1. DÉFINITION DU PLATEAU (0 = Vide, 1 = Blanc, 2 = Rouge)
+    int plateau[8][8] = {
+        {0, 2, 0, 2, 0, 2, 0, 2},
+        {2, 0, 2, 0, 2, 0, 2, 0},
+        {0, 2, 0, 2, 0, 2, 0, 2},
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 1, 0, 1, 0, 1, 0},
+        {0, 1, 0, 1, 0, 1, 0, 1},
+        {1, 0, 1, 0, 1, 0, 1, 0}
+    };
 
-    // Boucle principale du jeu (tant que la fenêtre est ouverte)
     while (window.isOpen())
     {
         sf::Event event;
         while (window.pollEvent(event))
         {
-            // Si on clique sur la croix, on ferme
             if (event.type == sf::Event::Closed)
                 window.close();
         }
 
-        // 1. Effacer l'écran (en noir par défaut)
-        window.clear();
+        window.clear(); // Effacer l'écran
 
-        // 2. Dessiner les objets
-        window.draw(pion);
+        // --- DESSIN DU JEU ---
 
-        // 3. Afficher le tout
-        window.display();
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                
+                // A. DESSINER LA CASE (LE DAMIER)
+                sf::RectangleShape caseCarre(sf::Vector2f(TILE_SIZE, TILE_SIZE));
+                caseCarre.setPosition(x * TILE_SIZE, y * TILE_SIZE);
+
+                // Si la somme de x et y est paire, c'est une case claire, sinon sombre
+                if ((x + y) % 2 == 0)
+                    caseCarre.setFillColor(sf::Color(238, 238, 210)); // Couleur Crème
+                else
+                    caseCarre.setFillColor(sf::Color(118, 150, 86));  // Couleur Verte/Bois
+
+                window.draw(caseCarre);
+
+                // B. DESSINER LE PION (S'il y en a un)
+                if (plateau[y][x] != 0) {
+                    sf::CircleShape pion(TILE_SIZE / 2 - 10); // Rayon un peu plus petit que la case
+                    // Centrer le pion dans la case
+                    pion.setPosition(x * TILE_SIZE + 10, y * TILE_SIZE + 10);
+
+                    if (plateau[y][x] == 1) 
+                        pion.setFillColor(sf::Color::White); // Pions du bas
+                    else 
+                        pion.setFillColor(sf::Color(200, 0, 0)); // Pions du haut (Rouge)
+                    
+                    window.draw(pion);
+                }
+            }
+        }
+
+        window.display(); // Afficher le tout
     }
 
     return 0;
